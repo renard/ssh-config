@@ -1,22 +1,37 @@
+;;;;
+;;;; This package helps you to create custom standalone Common Lisp images
+;;;; and to compile your project into a standalone app.
+;;;;
+;;;; Basically you have to define the *image-builder-config* and run (from
+;;;; shell)
+;;;;
+;;;; - with SBCL:
+;;;;     sbcl --no-sysinit --no-userinit --load image-builder.lisp
+;;;; - with CCL
+;;;;    ccl64  -n -l image-builder.lisp
+;;;;
+
 (require :asdf)
 
-
-;; using sbcl:
-;; time sbcl --no-sysinit --no-userinit --load image-builder.lisp
-
-;; using CCL
-;; time ccl64  -n -l image-builder.lisp
-	
-;; Quicklisp defines:
-;;(defvar *setup-url* "http://beta.quicklisp.org/quickstart/setup.lisp")
-	
-(asdf:defsystem :quicklisp-abcl
-  :description
-  "Load Quicklisp from the network if it isn't already installed. <urn:abcl.org/release/1.3.0-dev/contrib/quicklisp-abcl#0.2.0>"
-  :version "0.2.0"
+(asdf:defsystem #:image-builder
+  :description "Build standalone Common Lisp images and apps"
+  :author "Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>"
+  :license "WTFPL"
   :components nil)
 
+(defpackage #:image-builder
+  (:use #:cl)
+  (:export
+   #:*quicklisp-setup-url*
+   #:*build-directory*
+   #:*quicklisp-bootstrap-file*
+   #:*quicklisp-directory*
+   #:*quicklisp-local-projects-directory*
+   #:*quicklisp-init-file*
+   #:*image-builder-config*))
 
+(in-package #:image-builder)
+  
 (defparameter *quicklisp-setup-url*
   "http://beta.quicklisp.org/quicklisp.lisp"
   "URL from where to download QuickLisp.")
@@ -48,10 +63,9 @@
      (:url "https://github.com/mabragor/cl-yaclyaml.git" :method :git))
     :local-projects (:ssh-config :ssh-config-cli)
     :entry-point "ssh-config-cli:main"
-    :file-output "image"))
-
-
-
+    :file-output "image"
+    :options-sbcl (:purify t :executable t :compression t)
+    :options-ccl (:error-handler :quit :prepend-kernel t)))
 
 (defun install-quicklisp ()
   "Load Quicklisp from local build tree.
@@ -105,33 +119,42 @@ if there were an empty string between them."
 
 (defun string-to-function-symbol(string)
   (let ((elements (split-string-by-char (string-upcase string) :char #\:)))
-    (apply #'intern (reverse elements))))
+    (when elements
+      (apply #'intern (reverse elements)))))
 
-(defun write-image (entry-point output)
+(defun write-image (conf)
   ""
-  (let ((entry-function (string-to-function-symbol entry-point)))
+  (let ((entry-function (string-to-function-symbol
+			 (getf conf :entry-point))))
     #+sbcl
-    (progn
-      (format t "Compiling image for SBCL ~a~%" entry-function)
-      (sb-ext:save-lisp-and-die
-       (format nil "~a.sbcl.exe" output)
-       :purify t :executable t :compression t
-       :toplevel #'(lambda() (funcall entry-function sb-ext:*posix-argv*))))
+    (let ((args (append
+		 (cons (format nil "~a.sbcl.exe" (getf conf :file-output))
+		       (getf conf :options-sbcl))
+		 (when entry-function
+		   (list
+		    :toplevel
+		    #'(lambda()
+			(funcall entry-function sb-ext:*posix-argv*)))))))
+      (apply #'sb-ext:save-lisp-and-die args))
 
     #+ccl
-    (progn
-      (format t "Compiling image for CCL ~a~%" entry-function)
-      (save-application
-       (format nil "~a.ccl.exe" output)
-       :toplevel-function #'(lambda()
-			      (funcall entry-function
-				       (car ccl:*command-line-argument-list*)))
-       :prepend-kernel t))))
+    (let ((args (append
+		 (cons (format nil "~a.ccl.exe" (getf conf :file-output))
+		       (getf conf :options-ccl))
+		 (when entry-function
+		   (list :toplevel-function
+			 #'(lambda()
+			     (funcall entry-function
+				      (car ccl:*command-line-argument-list*))))))))
+      (apply #'ccl:save-application args))))
 
 
-(install-quicklisp)
-(loop for git in (getf *image-builder-config* :custom-modules)
-      do (clone-git git))
-(load-project (getf *image-builder-config* :local-projects))
-(write-image (getf *image-builder-config* :entry-point)
-	     (getf *image-builder-config* :file-output))
+(defun build-image (opts)
+  (install-quicklisp)
+  (loop for git in (getf opts :custom-modules)
+	do (clone-git git))
+  (load-project (getf opts :local-projects))
+  (write-image opts))
+
+			
+(build-image *image-builder-config*)
