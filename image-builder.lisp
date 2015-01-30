@@ -17,10 +17,26 @@
   :components nil)
 
 
+(defvar *quicklisp-setup-url*
+  "http://beta.quicklisp.org/quicklisp.lisp"
+  "URL from where to download QuickLisp.")
+
+
+(defvar *build-directory* #P"build/"
+	"Root of build directory")
+
+(defvar *quicklisp-directory* 
+  (merge-pathnames #P"quicklisp/" *build-directory*)
+  "Quicklisp intallation directory")
+
+(defvar *quicklisp-init-file*
+  (merge-pathnames #P"setup.lisp" *quicklisp-directory*)
+  "Path to the quicklisp setup file.")
+
 
 (defun install-quicklisp ()
-  ""
-  (let* ((path "build/quicklisp/")
+  "Load Quicklisp from local build tree"
+  (let* ((path #P"build/quicklisp/")
 	 (quicklisp-init (merge-pathnames "setup.lisp" path))
 	 (asdf:*central-registry* (list *default-pathname-defaults*)))
     (if (probe-file quicklisp-init)
@@ -31,8 +47,8 @@
 	  (format t "Creating ~a~%" path)
 	  (ensure-directories-exist path)
 	  (asdf:run-shell-command
-	   (format nil "curl -o ~a http://beta.quicklisp.org/quicklisp.lisp"
-		   quicklisp-init))
+	   (format nil "curl -o ~a ~a"
+		   quicklisp-init *quicklisp-setup-url*))
 	  (load quicklisp-init)
 	  (funcall (intern "INSTALL" "QUICKLISP-QUICKSTART") :path path)))))
 
