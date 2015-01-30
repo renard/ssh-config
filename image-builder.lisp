@@ -20,7 +20,7 @@
 
 (defun install-quicklisp ()
   ""
-  (let* ((path "build/quicklisp")
+  (let* ((path "build/quicklisp/")
 	 (quicklisp-init (merge-pathnames "setup.lisp" path))
 	 (asdf:*central-registry* (list *default-pathname-defaults*)))
     (if (probe-file quicklisp-init)
@@ -44,8 +44,6 @@
 
 (defun load-project (projects)
   ""
-  (format t "Loading build/quicklisp/setup.lisp~%")
-  (load "build/quicklisp/setup.lisp")
   (let ((asdf:*central-registry* (list *default-pathname-defaults*)))
     (funcall (intern "QUICKLOAD" "QUICKLISP") projects)))
 
