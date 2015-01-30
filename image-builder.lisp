@@ -6,9 +6,6 @@
 
 ;; using CCL
 ;; time ccl64  -n -l image-builder.lisp
-
-
-;; (in-package #:asdf)
 	
 ;; Quicklisp defines:
 ;;(defvar *setup-url* "http://beta.quicklisp.org/quickstart/setup.lisp")
@@ -19,9 +16,6 @@
   :version "0.2.0"
   :components nil)
 
-;; #+nil::needs-abcl-asdf((:iri "http://beta.quicklisp.org/quicklisp.lisp"))
-;;    #+nil::in-order-to ((asdf:compile-op (ql::install)))  ;;; FIXME tickle the internal Quicklisp setup
-
 
 
 (defun install-quicklisp ()
@@ -29,7 +23,6 @@
   (let* ((path "build/quicklisp")
 	 (quicklisp-init (merge-pathnames "setup.lisp" path))
 	 (asdf:*central-registry* (list *default-pathname-defaults*)))
-    ;; (pushnew *default-pathname-defaults* asdf:*central-registry*)
     (if (probe-file quicklisp-init)
 	(progn
 	  (format t "Loading ~a~%" quicklisp-init)
@@ -41,25 +34,7 @@
 	   (format nil "curl -o ~a http://beta.quicklisp.org/quicklisp.lisp"
 		   quicklisp-init))
 	  (load quicklisp-init)
-	  (funcall (intern "INSTALL" "QUICKLISP-QUICKSTART") :path path)
-	  ;; Make sure our project is known my quicklisp ans avoid symlink loops.
-	  ;; (with-open-file (stream "build/quicklisp/local-projects/system-index.txt"
-	  ;; 			  :direction :output :if-exists :supersede)
-	  ;;   (format stream "~{~a~%~}"
-	  ;; 	    (directory
-	  ;; 	     (make-pathname
-	  ;; 	      :directory (directory-namestring
-	  ;; 			  *default-pathname-defaults*)
-	  ;; 	      :name :wild
-	  ;; 	      :type "asd"))))
-
-	  ;; (asdf:run-shell-command
-	  ;;  (format nil "ln -nfs ~a build/quicklisp/local-projects/"
-	  ;; 	   (string-right-trim
-	  ;; 	    "/"
-	  ;; 	    (directory-namestring *default-pathname-defaults*))))
-
-	  ))))
+	  (funcall (intern "INSTALL" "QUICKLISP-QUICKSTART") :path path)))))
 
 
 (defun clone-git ()
@@ -102,11 +77,11 @@ if there were an empty string between them."
     (progn
       (format t "Compiling image for SBCL ~a~%" entry-function)
       (sb-ext:save-lisp-and-die
-       "image.exe"
+       "image.sbcl.exe"
        :purify t :executable t :compression t
        :toplevel #'(lambda() (funcall entry-function sb-ext:*posix-argv*))))
 
-    #+clozure
+    #+ccl
     (progn
       (format t "Compiling image for CCL ~a~%" entry-function)
       (save-application
@@ -121,69 +96,3 @@ if there were an empty string between them."
 (clone-git)
 (load-project '(:ssh-config :ssh-config-cli))
 (write-image "ssh-config-cli::main")
-
-
-;; (defun component-present-p (value)
-;;   (and value (not (eql value :unspecific))))
-
-;; (defun directory-pathname-p  (p)
-;;   (and
-;;    (not (component-present-p (pathname-name p)))
-;;    (not (component-present-p (pathname-type p)))
-;;    p))
-
-;; (defun pathname-as-directory (name)
-;;   (let ((pathname (pathname name)))
-;;     (when (wild-pathname-p pathname)
-;;       (error "Can't reliably convert wild pathnames."))
-;;     (if (not (directory-pathname-p name))
-;;       (make-pathname
-;;        :directory (append (or (pathname-directory pathname) (list :relative))
-;;                           (list (file-namestring pathname)))
-;;        :name      nil
-;;        :type      nil
-;;        :defaults pathname)
-;;       pathname)))
-
-
-;; (defun directory-wildcard (dirname)
-;;   (make-pathname
-;;    :name :wild
-;;    :type #-clisp :wild #+clisp nil
-;;    :defaults (pathname-as-directory dirname)))
-
-
-;; (defun list-directory (dirname)
-;;   (when (wild-pathname-p dirname)
-;;     (error "Can only list concrete directory names."))
-;;   (let ((wildcard (directory-wildcard dirname)))
-
-;;     #+(or sbcl cmu lispworks)
-;;     (directory wildcard)
-
-;;     #+openmcl
-;;     (directory wildcard :directories t)
-
-;;     #+allegro
-;;     (directory wildcard :directories-are-files nil)
-
-;;     #+clisp
-;;     (nconc
-;;      (directory wildcard)
-;;      (directory (clisp-subdirectories-wildcard wildcard)))
-
-;;     #-(or sbcl cmu lispworks openmcl allegro clisp)
-;;     (error "list-directory not implemented")))
-
-
-;; (defun walk-directory (dirname fn &key directories (test (constantly t)))
-;;   (labels
-;;       ((walk (name)
-;;          (cond
-;;            ((directory-pathname-p name)
-;;             (when (and directories (funcall test name))
-;;               (funcall fn name))
-;;             (dolist (x (list-directory name)) (walk x)))
-;;            ((funcall test name) (funcall fn name)))))
-;;     (walk (pathname-as-directory dirname))))
-
