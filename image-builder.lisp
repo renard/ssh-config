@@ -17,21 +17,40 @@
   :components nil)
 
 
-(defvar *quicklisp-setup-url*
+(defparameter *quicklisp-setup-url*
   "http://beta.quicklisp.org/quicklisp.lisp"
   "URL from where to download QuickLisp.")
 
-
-(defvar *build-directory* #P"build/"
+(defparameter *build-directory* #P"build/"
 	"Root of build directory")
 
-(defvar *quicklisp-directory* 
+(defparameter *quicklisp-bootstrap-file*
+  (merge-pathnames #P"quicklisp.lisp" *build-directory*)
+  "Path to the quicklisp bootstrap file.")
+
+
+(defparameter *quicklisp-directory* 
   (merge-pathnames #P"quicklisp/" *build-directory*)
   "Quicklisp intallation directory")
 
-(defvar *quicklisp-init-file*
+(defparameter *quicklisp-local-projects-directory* 
+  (merge-pathnames #P"local-projects/" *quicklisp-directory*)
+  "Quicklisp local projects directory")
+
+(defparameter *quicklisp-init-file*
   (merge-pathnames #P"setup.lisp" *quicklisp-directory*)
   "Path to the quicklisp setup file.")
+
+
+(defparameter *image-builder-config*
+  '(:custom-modules
+    ((:url "https://github.com/mabragor/esrap-liquid.git" :method :git)
+     (:url "https://github.com/mabragor/cl-yaclyaml.git" :method :git))
+    :local-projects (:ssh-config :ssh-config-cli)
+    :entry-point "ssh-config-cli:main"
+    :file-output "image"))
+
+
 
 
 (defun install-quicklisp ()
@@ -49,15 +68,21 @@ If Quicklisp *QUICKLISP-INIT-FILE* is not found, download it from
 	  (ensure-directories-exist *quicklisp-directory*)
 	  (asdf:run-shell-command
 	   (format nil "curl -o ~a ~a"
-		   *quicklisp-init-file* *quicklisp-setup-url*))
-	  (load *quicklisp-init-file*)
+		   *quicklisp-bootstrap-file* *quicklisp-setup-url*))
+	  (load *quicklisp-bootstrap-file*)
 	  (funcall (intern "INSTALL" "QUICKLISP-QUICKSTART")
 		   :path *quicklisp-directory*)))))
 
 
-(defun clone-git ()
-  (asdf:run-shell-command "git clone https://github.com/mabragor/esrap-liquid.git build/quicklisp/local-projects/esrap-liquid")
-  (asdf:run-shell-command "git clone https://github.com/mabragor/cl-yaclyaml.git build/quicklisp/local-projects/cl-yaclyaml"))
+(defun clone-git (git-config)
+  (let* ((url (getf git-config :url))
+	 (directory (when url (pathname-name url)))
+	 (target (when directory
+		   (merge-pathnames directory *quicklisp-local-projects-directory*))))
+    (when target
+      (unless (probe-file target)
+	(asdf:run-shell-command
+	 (format nil "git clone ~a ~a" url target))))))
 
 
 (defun load-project (projects)
@@ -82,14 +107,14 @@ if there were an empty string between them."
   (let ((elements (split-string-by-char (string-upcase string) :char #\:)))
     (apply #'intern (reverse elements))))
 
-(defun write-image (entry-point)
+(defun write-image (entry-point output)
   ""
   (let ((entry-function (string-to-function-symbol entry-point)))
     #+sbcl
     (progn
       (format t "Compiling image for SBCL ~a~%" entry-function)
       (sb-ext:save-lisp-and-die
-       "image.sbcl.exe"
+       (format nil "~a.sbcl.exe" output)
        :purify t :executable t :compression t
        :toplevel #'(lambda() (funcall entry-function sb-ext:*posix-argv*))))
 
@@ -97,7 +122,7 @@ if there were an empty string between them."
     (progn
       (format t "Compiling image for CCL ~a~%" entry-function)
       (save-application
-       "image.ccl.exe"
+       (format nil "~a.ccl.exe" output)
        :toplevel-function #'(lambda()
 			      (funcall entry-function
 				       (car ccl:*command-line-argument-list*)))
@@ -105,6 +130,8 @@ if there were an empty string between them."
 
 
 (install-quicklisp)
-(clone-git)
-(load-project '(:ssh-config :ssh-config-cli))
-(write-image "ssh-config-cli::main")
+(loop for git in (getf *image-builder-config* :custom-modules)
+      do (clone-git git))
+(load-project (getf *image-builder-config* :local-projects))
+(write-image (getf *image-builder-config* :entry-point)
+	     (getf *image-builder-config* :file-output))
