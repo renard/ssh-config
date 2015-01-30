@@ -46,12 +46,8 @@
   ""
   (format t "Loading build/quicklisp/setup.lisp~%")
   (load "build/quicklisp/setup.lisp")
-  (let ((projects (if (listp projects) projects (list projects)))
-	(asdf:*central-registry* (list *default-pathname-defaults*)))
-    (loop for project in projects
-	  do (progn
-	       (format t "Loading ~a~%" project)
-	       (funcall (intern "QUICKLOAD" "QUICKLISP") project)))))
+  (let ((asdf:*central-registry* (list *default-pathname-defaults*)))
+    (funcall (intern "QUICKLOAD" "QUICKLISP") projects)))
 
 
 (defun split-string-by-char (string &key (char #\:))
