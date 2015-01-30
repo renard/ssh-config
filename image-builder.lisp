@@ -28,7 +28,7 @@
    #:*quicklisp-directory*
    #:*quicklisp-local-projects-directory*
    #:*quicklisp-init-file*
-   #:*image-builder-config*))
+   #:build-image))
 
 (in-package #:image-builder)
   
@@ -57,15 +57,15 @@
   "Path to the quicklisp setup file.")
 
 
-(defparameter *image-builder-config*
-  '(:custom-modules
-    ((:url "https://github.com/mabragor/esrap-liquid.git" :method :git)
-     (:url "https://github.com/mabragor/cl-yaclyaml.git" :method :git))
-    :local-projects (:ssh-config :ssh-config-cli)
-    :entry-point "ssh-config-cli:main"
-    :file-output "image"
-    :options-sbcl (:purify t :executable t :compression t)
-    :options-ccl (:error-handler :quit :prepend-kernel t)))
+(defun die(&key (return-code 0) message)
+  "A simple portable exit function."
+  (when message
+    (format (if return-code *error-output* t) "~a~%" message))
+  #+sbcl
+  (sb-ext:exit :code return-code)
+  #+ccl
+  (ccl:quit return-code))
+
 
 (defun install-quicklisp ()
   "Load Quicklisp from local build tree.
@@ -101,8 +101,9 @@ If Quicklisp *QUICKLISP-INIT-FILE* is not found, download it from
 
 (defun load-project (projects)
   "Load quicklisp PROJECTS."
-  (let ((asdf:*central-registry* (list *default-pathname-defaults*)))
-    (funcall (intern "QUICKLOAD" "QUICKLISP") projects)))
+  (when projects
+    (let ((asdf:*central-registry* (list *default-pathname-defaults*)))
+      (funcall (intern "QUICKLOAD" "QUICKLISP") projects))))
 
 
 (defun split-string-by-char (string &key (char #\:))
@@ -136,7 +137,7 @@ if there were an empty string between them."
 		    #'(lambda()
 			(funcall entry-function sb-ext:*posix-argv*)))))))
       (apply #'sb-ext:save-lisp-and-die args))
-
+    
     #+ccl
     (let ((args (append
 		 (cons (format nil "~a.ccl.exe" (getf conf :file-output))
@@ -148,29 +149,27 @@ if there were an empty string between them."
 				      (car ccl:*command-line-argument-list*))))))))
       (apply #'ccl:save-application args))))
 
-;; (with-input-from-string (s "(:local-projects (:ssh-config :ssh-config-cli))")
-;; 	   (read s))
-
-
 (defun build-image ()
   (let* ((config-file #P"image-builder.conf")
 	 (opts
 	   (handler-case
 	       (with-open-file (stream config-file) (read stream))
 	     (condition (c)
-	       (progn
-		 (format t "~a~%" c)
-		 (values nil c))))))
+	       (die :return-code 1 :message (format nil "~a~%" c))))))
     (when opts
       (install-quicklisp)
+      
       (loop for git in (getf opts :custom-modules)
 	    do (clone-git git))
+      
       (load-project (getf opts :local-projects))
       (write-image opts))
     ;; Shouldn't be reached except on parse error
-    #+sbcl
-    (sb-ext:exit)
-    #+ccl
-    (ccl:quit)))
-			
-(build-image)
+    (die :return-code 2
+	 :message "Couldn't find build-image configuration.")))
+
+(handler-case
+    (build-image)
+  (condition (c)
+    (die :return-code 1
+	 :message (format nil "Something went wrong:~%~a" c))))
