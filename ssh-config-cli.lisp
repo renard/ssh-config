@@ -7,3 +7,4 @@
 
 (defun main (argv)
   (ssh-config:generate-ssh-config))
+

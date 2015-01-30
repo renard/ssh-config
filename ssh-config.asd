@@ -3,7 +3,7 @@
   :description ""
   :author "Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>"
   :license "WTFPL"
-  :pathname "."
+  :pathname "src"
   :depends-on (#:cl-yaclyaml)
   :components ((:file "ssh-config")))
 
