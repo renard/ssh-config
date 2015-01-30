@@ -35,22 +35,24 @@
 
 
 (defun install-quicklisp ()
-  "Load Quicklisp from local build tree"
-  (let* ((path #P"build/quicklisp/")
-	 (quicklisp-init (merge-pathnames "setup.lisp" path))
-	 (asdf:*central-registry* (list *default-pathname-defaults*)))
-    (if (probe-file quicklisp-init)
+  "Load Quicklisp from local build tree.
+
+If Quicklisp *QUICKLISP-INIT-FILE* is not found, download it from
+*QUICKLISP-SETUP-URL* into *QUICKLISP-DIRECTORY* and load it."
+  (let ((asdf:*central-registry* (list *default-pathname-defaults*)))
+    (if (probe-file *quicklisp-init-file*)
 	(progn
-	  (format t "Loading ~a~%" quicklisp-init)
-	  (load quicklisp-init))
+	  (format t "Loading ~a~%" *quicklisp-init-file*)
+	  (load *quicklisp-init-file*))
 	(progn
-	  (format t "Creating ~a~%" path)
-	  (ensure-directories-exist path)
+	  (format t "Creating ~a~%" *quicklisp-directory*)
+	  (ensure-directories-exist *quicklisp-directory*)
 	  (asdf:run-shell-command
 	   (format nil "curl -o ~a ~a"
-		   quicklisp-init *quicklisp-setup-url*))
-	  (load quicklisp-init)
-	  (funcall (intern "INSTALL" "QUICKLISP-QUICKSTART") :path path)))))
+		   *quicklisp-init-file* *quicklisp-setup-url*))
+	  (load *quicklisp-init-file*)
+	  (funcall (intern "INSTALL" "QUICKLISP-QUICKSTART")
+		   :path *quicklisp-directory*)))))
 
 
 (defun clone-git ()
@@ -59,7 +61,7 @@
 
 
 (defun load-project (projects)
-  ""
+  "Load quicklisp PROJECTS."
   (let ((asdf:*central-registry* (list *default-pathname-defaults*)))
     (funcall (intern "QUICKLOAD" "QUICKLISP") projects)))
 
