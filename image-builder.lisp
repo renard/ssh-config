@@ -148,13 +148,29 @@ if there were an empty string between them."
 				      (car ccl:*command-line-argument-list*))))))))
       (apply #'ccl:save-application args))))
 
+;; (with-input-from-string (s "(:local-projects (:ssh-config :ssh-config-cli))")
+;; 	   (read s))
 
-(defun build-image (opts)
-  (install-quicklisp)
-  (loop for git in (getf opts :custom-modules)
-	do (clone-git git))
-  (load-project (getf opts :local-projects))
-  (write-image opts))
 
+(defun build-image ()
+  (let* ((config-file #P"image-builder.conf")
+	 (opts
+	   (handler-case
+	       (with-open-file (stream config-file) (read stream))
+	     (condition (c)
+	       (progn
+		 (format t "~a~%" c)
+		 (values nil c))))))
+    (when opts
+      (install-quicklisp)
+      (loop for git in (getf opts :custom-modules)
+	    do (clone-git git))
+      (load-project (getf opts :local-projects))
+      (write-image opts))
+    ;; Shouldn't be reached except on parse error
+    #+sbcl
+    (sb-ext:exit)
+    #+ccl
+    (ccl:quit)))
 			
-(build-image *image-builder-config*)
+(build-image)
