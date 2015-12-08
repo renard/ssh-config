@@ -1,129 +1,36 @@
-APP_NAME   = ssh-config
+IMAGE_BUILDER_URL = https://raw.githubusercontent.com/renard/cl-image-builder/dev/image-builder.lisp
+BUILDDIR      = build
+IMAGE_BUILDER = $(BUILDDIR)/image-builder.lisp
+#IMAGE_BUILDER = ../image-builder/image-builder.lisp
+ASDF          = $(wildcard *.asd)
+APP           = $(patsubst %.asd,%,$(ASDF))
 
-CL	   = sbcl
-
-BUILDDIR   = build
-LIBS       = $(BUILDDIR)/libs.stamp
-BUILDAPP   = $(BUILDDIR)/buildapp
-MANIFEST   = $(BUILDDIR)/manifest.ql
-APP        = $(BUILDDIR)/test-$(APP_NAME).$(CL).exe
-QLDIR      = $(BUILDDIR)/quicklisp
-QL_DEPENDS = :$(APP_NAME)
-
-BUILDAPP_CCL  = $(BUILDDIR)/buildapp.ccl
-BUILDAPP_SBCL = $(BUILDDIR)/buildapp.sbcl
-
-ifeq ($(CL),sbcl)
-BUILDAPP   = $(BUILDAPP_SBCL)
-CL_OPTS    = --no-sysinit --no-userinit
-else
-BUILDAPP   = $(BUILDAPP_CCL)
-CL_OPTS    = --no-init
-endif
-
-COMPRESS_CORE ?= yes
-
-ifeq ($(CL),sbcl)
-ifeq ($(COMPRESS_CORE),yes)
-COMPRESS_CORE_OPT = --compress-core
-else
-COMPRESS_CORE_OPT = 
-endif
-endif
-
-ifeq ($(CL),sbcl)
-BUILDAPP_OPTS =          --require sb-posix                      \
-                         --require sb-bsd-sockets                \
-                         --require sb-rotate-byte
-endif
 
 all: $(APP)
 
-$(QLDIR)/setup.lisp:
-	mkdir -p $(BUILDDIR)
-	curl -o $(QLDIR).lisp http://beta.quicklisp.org/quicklisp.lisp
-	$(CL) $(CL_OPTS) --load $(QLDIR).lisp                  \
-             --eval '(quicklisp-quickstart:install :path "$(BUILDDIR)/quicklisp")'  \
-             --eval '(quit)'
+$(BUILDDIR):
+	mkdir -p $@
 
-quicklisp: $(QLDIR)/setup.lisp ;
-	ln -nfs `pwd` $(QLDIR)/local-projects/$(APP_NAME)
-
-# $(QLDIR)/local-projects/cl-cidr-notation:
-# 	git clone https://github.com/AccelerationNet/cl-cidr-notation.git $(QLDIR)/local-projects/cl-cidr-notation
+$(IMAGE_BUILDER): $(BUILDDIR)
+	curl -o $@ https://raw.githubusercontent.com/renard/cl-image-builder/master/image-builder.lisp
 
 
+sbcl: $(APP).sbcl.exe
+$(APP).sbcl.exe: $(IMAGE_BUILDER)
+	sbcl --no-sysinit --no-userinit \
+		--load $(IMAGE_BUILDER) \
+		--eval '(image-builder:build-image)' 
 
-$(QLDIR)/local-projects/esrap-liquid:
-	git clone https://github.com/mabragor/esrap-liquid.git $@
+ccl: $(APP).ccl.exe
+$(APP).ccl.exe: $(IMAGE_BUILDER)
+	ccl64 -n -l $(IMAGE_BUILDER) \
+		--eval '(image-builder:build-image)'
 
-$(QLDIR)/local-projects/cl-yaclyaml:
-	git clone https://github.com/mabragor/cl-yaclyaml.git $@
-
-extra-libs: $(QLDIR)/local-projects/esrap-liquid \
-		$(QLDIR)/local-projects/cl-yaclyaml ;
-
-
-
-$(LIBS): quicklisp extra-libs
-	mkdir -p $(BUILDDIR)
-	$(CL) $(CL_OPTS) --load $(QLDIR)/setup.lisp                \
-             --eval "(ql:quickload (list $(QL_DEPENDS)))" \
-             --eval '(quit)'
-	touch $@
-
-libs: $(LIBS) ;
-
-$(MANIFEST): libs
-	$(CL) $(CL_OPTS) --load $(QLDIR)/setup.lisp                                 \
-             --eval '(ql:write-asdf-manifest-file "./build/manifest.ql")'  \
-             --eval '(quit)'
-
-$(BUILDAPP_CCL): $(QLDIR)/setup.lisp
-	mkdir -p $(BUILDDIR)
-	$(CL) $(CL_OPTS) --load $(QLDIR)/setup.lisp               \
-             --eval '(ql:quickload "buildapp")'                   \
-             --eval '(buildapp:build-buildapp "$@")'              \
-             --eval '(quit)'
-
-$(BUILDAPP_SBCL): $(QLDIR)/setup.lisp
-	mkdir -p $(BUILDDIR)
-	$(CL) $(CL_OPTS) --load $(QLDIR)/setup.lisp               \
-             --eval '(ql:quickload "buildapp")'                   \
-             --eval '(buildapp:build-buildapp "$@")'              \
-             --eval '(quit)'
-
-
-
-manifest: $(MANIFEST) ;
-
-buildapp: $(BUILDAPP) ;
-
-$(APP): manifest buildapp
-	$(BUILDAPP) --logfile /tmp/build.log                \
-                         --asdf-tree $(QLDIR)/local-projects  \
-			 $(BUILDAPP_OPTS)                        \
-                         --sbcl $(CL)                            \
-                         --manifest-file ./build/manifest.ql     \
-                         --asdf-tree $(QLDIR)/dists           \
-                         --asdf-path .                           \
-			 --load-system $(APP_NAME)          \
-                         --load-system $(APP_NAME)-cli          \
-                         --entry $(APP_NAME)-cli::main           \
-                         --dynamic-space-size 4096               \
-			 $(COMPRESS_CORE_OPT)                    \
-                         --output $@
-
-
-app: $(APP) ;
+$(APP): $(APP).sbcl.exe $(APP).ccl.exe;
+app: sbcl ccl
 
 
 clean:
 	rm -fr $(BUILDDIR)
 
-test:
-	$(APP) test/test.sh
-
-check: test ;
-
-.PHONY: test
+.PHONY: clean
