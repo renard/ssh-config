@@ -1,7 +1,8 @@
 (defpackage #:ssh-config
-  (:use #:cl)
+  (:use #:cl #:cl-fad)
   (:export
    #:*verbose*
+   #:*version*
    #:*pc-timeout*
    #:*nc-timeout*
    #:*debug*
@@ -13,16 +14,17 @@
 (defvar *pc-timeout*)
 (defvar *nc-timeout*)
 (defvar *verbose*)
+(defvar *version*)
 (defvar *debug*)
 (defvar *help*)
 
-(defvar *version* "1.0")
+(defvar *version-string* "1.0")
 
 
 (defun help ()
     (cl-cli:help *options* *commands*
-		       :prog-name (uiop:argv0)
-		       :version *version*)
+		       :prog-name (path:basename (uiop:argv0))
+		       :version *version-string*)
 	  (uiop:quit))  
 
 
@@ -34,6 +36,7 @@
      :alias ("-n")
      :params ("TIMEOUT") :type integer)
     (*verbose* nil "Run in verbose mode" :alias ("-v"))
+    (*version* nil "Display version" :alias ("-V"))
     (*debug* nil "Run in debug mode" :alias ("-d"))
     (*help* nil "Display help screen" :alias ("-h"))))
 
@@ -41,17 +44,22 @@
 
 (cl-cli:defcommand-to-list *commands*
     ("upgrade")
-    nil
+  (&key (rebuild nil "Do a full rebuild"))
   "Self upgrade (must be run in a git checkout of the sources)."
 
  (handler-case
-     (if ssh-config::*debug*
-     	 (image-builder:upgrade :verbose ssh-config::*verbose*)
+     (if ssh-config:*debug*
+	 (if rebuild
+	     (image-builder:build-image)
+	     (image-builder:upgrade :verbose ssh-config:*verbose*))
+
 	 (handler-bind ((warning #'muffle-warning))
-	   (image-builder:upgrade :verbose ssh-config::*verbose*)))
+	   	 (if rebuild
+	     (image-builder:build-image)
+	     (image-builder:upgrade :verbose ssh-config:*verbose*))))
     (error (c)
       (format *error-output* "~%Fatal: ~a~%" c)
-      (if ssh-config::*debug*
+      (if ssh-config:*debug*
     	  (invoke-debugger c)
     	  (uiop:quit 2)))))
 
