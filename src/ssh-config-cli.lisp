@@ -69,14 +69,24 @@
     ;; (format t
     ;; 	    "ret ~S~%opts-vars ~S~%opts-values ~S~%sub-func ~S~%sub-opts ~S~%argv ~S~%" ret opts-vars opts-values sub-func sub-opts argv)
     (unless ret
+	  (cl-cli:with-environment
+	    opts-vars opts-values
+	    (handler-case
+		(progn
+		  (when ssh-config:*version*
+		    (cl-cli:version
+		     (path:basename (uiop:argv0))
+		     *version-string*
+		     :quit 0))
+		  (when ssh-config:*help* (help))
+		  ;; (format t "v: ~a, d: ~a, h: ~a~%" *verbose* *debug* *help*)
+		  (ssh-config:generate-ssh-config))
+	      (condition (c)
+		(format *error-output* "Something went wrong: ~a~%" c)
+		(if ssh-config:*debug*
+		    (invoke-debugger c)
+		    (uiop:quit 1))))))))
 
-      (cl-cli:with-environment opts-vars opts-values
-      
-	(when ssh-config::*help* (help))
-	
-	;; (format t "v: ~a, d: ~a, h: ~a~%" *verbose* *debug* *help*)
-	(ssh-config:generate-ssh-config)))))
-      
   ;; (when (string= "update" (nth 1 argv))
   ;;   (image-builder:upgrade :verbose t))
   ;; (ssh-config:generate-ssh-config)
