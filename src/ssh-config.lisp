@@ -174,7 +174,13 @@ structure."
   (with-open-file (stream file :external-format :utf-8)
     (let ((data (make-string (file-length stream))))
       (read-sequence data stream)
-      (read-from-string data))))
+      (handler-case
+	  (read-from-string data)
+	(condition (c)
+	(format t "Fatal: Loading ~a: ~a~%" file c)
+	(if ssh-config::*debug*
+	    (invoke-debugger c)
+	    (uiop:quit 1)))))))
 
 
 (defun parse-ssh-lisp (hosts &key (stream t) user parent prefix group (indent ""))
