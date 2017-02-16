@@ -69,6 +69,7 @@
     "Display help."
   (help))
 
+(ssh-config::make-ssh-config-struct)
 
 (defun main (argv)
   (multiple-value-bind (ret opts-vars opts-values sub-func sub-opts argv)

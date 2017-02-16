@@ -3,7 +3,9 @@
   :description ""
   :author "Sébastien Gross <seb•ɑƬ•chezwam•ɖɵʈ•org>"
   :license "WTFPL"
-  :depends-on (#:cl-cli #:cl-fad)
+  :depends-on (#:cl-cli #:cl-fad #:image-builder)
   :pathname "src"
-  :components  ((:file "ssh-config")
-		(:file "ssh-config-cli")))
+  :components  (
+		(:file "ssh-config-ng")
+		(:file "ssh-config-cli")
+		))
