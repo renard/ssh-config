@@ -84,6 +84,8 @@
     "SendEnv"
     "ServerAliveCountMax"
     "ServerAliveInterval"
+    "StreamLocalBindMask"
+    "StreamLocalBindUnlink"
     "StrictHostKeyChecking"
     "TCPKeepAlive"
     "Tunnel"
