@@ -172,12 +172,6 @@ structure."
 
 
 (defun merge-hosts (a b)
-  ;; (format t "a: ~a~%" (type-of a))
-  ;; (format t "b: ~a~%" (type-of b))
-  ;; (format t "~%~%--- a ---~%")
-  ;; (print-ssh-config-debug a)
-  ;; (format t "--- b ---~%")
-  ;; (print-ssh-config-debug b)
   (when (ssh-opt-p a)
     (loop for opt in (append *ssh-options* *ssh-options-extra*)
        for slot = (intern (string-upcase opt) "KEYWORD")
@@ -186,17 +180,7 @@ structure."
 	     (not (slot-value b slot))
 	     (slot-value a slot))
        do (progn
-	    ;; (format t "## Merging ~(~a~) ~((~a)~) -> ~((~a)~)~%"
-	    ;; 	    slot
-	    ;; 	    (slot-value b slot)
-	    ;; 	    (slot-value a slot))
-	    (setf (slot-value b slot) (slot-value a slot)))
-	 ))
-  ;; (format t "--- A ---~%")
-  ;; (print-ssh-config-debug a)
-  ;; (format t "--- B ---~%")
-  ;; (print-ssh-config-debug b)
-  ;; (format t "--- - ---~%~%")
+	    (setf (slot-value b slot) (slot-value a slot)))))
   b)
 
 (defun host-to-ssh-conf (hosts &key (parent nil) (group nil) (stream t) (indent ""))
@@ -239,31 +223,7 @@ structure."
 				 :group group
 				 :parent this-parent
 				 :indent (format nil "  ~a" indent)
-				 :stream stream)))
-
-	   
-	    )))))
-;; (defun host-to-ssh-conf (hosts &key (parent nil) (stream t))
-;;   (loop for host in hosts
-;; 	if (and host (getf host :hosts))
-;; 	  do (let ((this-parent  (generate-host host)))
-;; 	       (when (ssh-opt-name this-parent))
-;; 		 (print-ssh-config this-parent :stream stream)
-;; 		 (format stream "~%")
-;; 	       ;; (setq this-parent (merge-hosts parent this-parent))
-;; 	       (when (ssh-opt-group parent)
-;; 		 (setf (slot-value this-parent :PROXYCOMMAND)
-;; 		       (format nil "ssh -o ConnectTimeout=10 -q -t ~(~a~) nc -w 60 %h %p" (ssh-opt-name parent)))
-;; 	       )
-	       
-;; 	       (host-to-ssh-conf (getf host :hosts) :parent this-parent :stream stream))
-;; 	else
-;;      do (when host
-;; 	  (let ((h (generate-host host)))
-;; 	    (setq h (merge-hosts parent h))
-;; 	    (print-ssh-config h :stream stream)
-;; 	    (format stream "~%")))))
-
+				 :stream stream))))))))
 
 
 (defun generate-ssh-config (&key (src "~/.ssh/hosts.lisp") (dest "~/.ssh/config"))
@@ -285,16 +245,3 @@ structure."
 	    (uiop:quit 1))))
     
     (rename-file (truename tmp-dest) dest)))
-
-
-
-;; (defun generate-ssh-config()
-;;   (host-to-ssh-conf
-;;    (load-configuration #P"/Users/renard/.ssh/hosts.lisp"))
-;;   )
-;; (host-to-ssh-conf (load-configuration #P"/Users/renard/Src/ssh-config/src/host.lisp"))
-
-;; (with-open-file (stream #P"/tmp/ssh.config" :direction :output :if-exists :supersede)
-;;   (host-to-ssh-conf
-;;    (load-configuration #P"/tmp/hosts.lisp")
-;;    :stream stream))
